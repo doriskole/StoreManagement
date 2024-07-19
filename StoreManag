@@ -1,0 +1,746 @@
+#include <stdio.h>
+#include <string.h>
+#include <curses.h>
+#include <time.h>
+
+void update(int x);
+
+struct artikulli              
+{
+	char id[50];
+	int cmimi;
+	char emri[200];
+	char kategoria[100];
+	int sasia;
+} a[100];         //pra kemi 100 artikuj
+
+struct klienti                   
+{
+	char id[10];
+	char emri[50];
+	char mbiemri[50];
+	int nrTel;
+} k[100];
+
+struct detaje                 //krijojme nje nenstrukture
+{
+		char artikId[50];
+		int sasiaA;
+		int cmimiA;	
+		int totali;
+};
+	
+struct shitje
+{
+	struct detaje info[50];
+	char klientId[10];
+	int faturaid;
+	char data[30];
+	int vleraFatures;
+} sh[100];
+	
+struct furnizim
+{
+	int id;
+	char data[30];
+	int vleraFatures;
+	int sasiaT;
+	int totali;
+	struct detaje detaj[50];
+	
+} f[100];
+
+struct klient1     //ruan id e klienteve bashke me numrin e blerjeve qe ka bere secili
+{
+	char id[10];
+	int nr_blerjeve;
+} kl[100];
+
+struct klient2    //ruan id e cdo klienti dhe vleren qe ka shpenzuar secili
+{
+	char id[10];
+	int vleraShpenzuar;
+} kl2[100];
+
+int nr_artikujve;
+int nr_klienteve;
+int nr_shitjeve;
+int nr_furnizimeve;
+
+char f_artikuj[50]="artikuj.dat";
+char f_supply[50]="supply.dat";
+char f_klient[50]="klient.dat";
+char f_shitje[50]="shitje.dat";
+
+
+//********************************************************
+//funksionet e meposhtme lexo bejne mbushjen e strukturave perkatese me infot qe ndodhen ne file
+
+void lexoArtikujt()
+{
+	//                          ARTIKULLI
+	FILE *f;
+	f=fopen(f_artikuj,"rb");
+ 	if (f==NULL)
+ 	{
+   		printf("\nGabim ne file");
+   		return;
+ 	}
+ 
+ 	nr_artikujve=0;
+ 
+ 	while (fread(&a[nr_artikujve],sizeof(struct artikulli),1,f))
+ 	{
+   		nr_artikujve++;
+ 	} 
+ 	fclose(f); 
+ 	
+}
+
+void lexoKlientet()
+{
+	//                          KLIENTI
+	FILE *f;
+	f=fopen(f_klient,"rb");
+ 	if (f==NULL)
+ 	{
+   		printf("\nGabim ne file");
+   		return;
+ 	}
+ 
+ 	nr_klienteve=0;
+ 
+ 	while (fread(&k[nr_klienteve],sizeof(struct klienti),1,f))
+ 	{
+   		nr_klienteve++;
+ 	} 
+ 	fclose(f); 
+ 	
+}
+
+void lexoFurnizimet()
+{
+	//                              FURNIZIM
+ 	FILE *fpt;
+	fpt=fopen(f_supply,"rb");
+ 	if (fpt==NULL)
+ 	{
+   		printf("\nGabim ne file");
+   		return;
+ 	}
+ 
+ 	nr_furnizimeve=0;
+
+ 	while(fread(&f[nr_furnizimeve],sizeof(struct furnizim),1,fpt))
+ 	{
+   		nr_furnizimeve++;
+ 	} 
+ 	fclose(fpt); 
+}
+
+void lexoShitjet()
+{
+	//                              SHITJE
+ 	FILE *f1;
+	f1=fopen(f_shitje,"rb");
+ 	if (f1==NULL)
+ 	{
+   		printf("\nGabim ne file");
+   		return;
+ 	}
+ 
+ 	nr_shitjeve=0;
+ 
+ 	while(fread(&sh[nr_shitjeve],sizeof(struct shitje),1,f1))
+ 	{
+   		nr_shitjeve++;
+ 	} 
+ 	fclose(f1); 
+}
+
+void loadklient1()             
+{
+	int blerjet = 0;      //temporarily saves the number of purchases by clients
+	struct klient1 tmp;
+	for(int i=0; i<nr_klienteve; i++)
+	{
+		blerjet = 0;
+		for(int j=0; j<nr_shitjeve; j++)
+		{
+			if(strcmp(k[i].id, sh[j].klientId)==0)
+			{
+				blerjet++;
+			}
+		}
+		strcpy(tmp.id, k[i].id);
+		tmp.nr_blerjeve = blerjet;
+		
+		kl[i] = tmp;
+	}
+}
+
+void loadklient2()                
+{
+	int vlera = 0; // tempraroly saves the amount spent by each client in the store
+	struct klient2 tmp;
+	for(int i=0; i<nr_klienteve; i++)
+	{
+		vlera = 0;
+		for(int j=0; j<nr_shitjeve; j++)
+		{
+			if(strcmp(k[i].id, sh[j].klientId)==0)
+			{
+				vlera += sh[j].vleraFatures;
+			}
+		}
+		strcpy(tmp.id, k[i].id);    
+		tmp.vleraShpenzuar = vlera;     //vlera e shpenzuar per klientin vendoset ne te njejtin pozicion ne strukturen temporale klinet2 tmp
+		
+		kl2[i] = tmp;  // te dhenat e ruajtura ne strukturen temporale tmp vendosen tek struktura kl2
+	}
+}
+//---------------------------------------------------------------------------
+
+void menu()
+{
+		  printf("\n");
+		  printf("\n     Detyre Kursi gjuha C");
+		  printf("\n");
+		  printf("\n 1 - Regjistrim artikulli");
+		  printf("\n 2 - Regjistrim Klienti");
+		  printf("\n 3 - Furnizim");
+		  printf("\n 4 - Shitje");
+		  printf("\n 5 - Gjendja ne magazine");
+		  printf("\n 6 - 10 Klientet qe blejne me shume");
+		  printf("\n 7 - 20 Klientet qe blejne me shpesh");
+		  printf("\n 8 - Kerko nje artikull me barkod");
+		  printf("\n r - Paraqit rezultate te pergjithshme");
+		  printf("\n d - Dalja");
+		  printf("\n Zgjedhja : ");
+}
+//--------------------------------------------------------------------------------------------------------------------------------------------------------
+
+void regjistro_artikull()
+{
+	char id_tmp[50];
+
+	printf("\nJepni ID e artikullit: ");
+	gets(id_tmp);
+	
+	if(strlen(id_tmp)!=8)
+	{
+		printf("\nID duhet te permbaje vetem 8 shifra!");
+		return;
+	}
+	
+	for(int i=0; i<nr_artikujve; i++)
+	{
+		if (strcmp(id_tmp, a[i].id)==0)
+		{
+    printf("Regjistrimi nuk mund te vazhdoje sepse ekziston nje artikull me kete id ne sistem!");
+			return;
+		}
+	}
+
+	strcpy(a[nr_artikujve].id, id_tmp);
+
+	printf("Jepni Emrin e artikullit: ");
+	gets(a[nr_artikujve].emri);
+		
+	printf("Jepni Kategorine: ");
+	gets(a[nr_artikujve].kategoria);
+	
+	
+	int c;
+      printf("Jepni cmimin: ");
+	scanf("%d",&c);
+	a[nr_artikujve].cmimi = c;
+	a[nr_artikujve].sasia = 0;
+
+	nr_artikujve++;
+	
+	update(1);
+}
+
+void regjistro_klient()
+{
+	
+	char id_tmp[10];
+	//funksioni sprintf e konverton nr_klienteve + 1000 ne string dhe e vendos ate ne id_tmp ku ruhet id temporale e klientit
+	sprintf(id_tmp, "%d", nr_klienteve+1000);
+	
+	printf("\nID e gjeneruar per klientin eshte: %s", id_tmp);
+	
+	
+	for(int i=0; i<nr_klienteve; i++)
+	{
+		if (id_tmp==k[i].id)
+		{
+			printf("Regjistrimi nuk mund te vazhdoje sepse ekziston nje klient me kete id ne sistem.");
+			return;
+		}
+	}
+	
+	strcpy(k[nr_klienteve].id, id_tmp);
+
+	printf("\nJepni emrin: ");
+	scanf("%s",k[nr_klienteve].emri);
+	
+	printf("Jepni mbiemrin: ");
+	scanf("%s",k[nr_klienteve].mbiemri);
+	
+	int c;
+    printf("Jepni Nr. tel: ");
+	scanf("%d",&c);
+	k[nr_klienteve].nrTel = c;
+	
+
+	nr_klienteve++;
+	
+	update(3);
+}
+
+//---------------------------------------------------------------------------
+
+void furnizim()
+{
+	int id_tmp = nr_furnizimeve + 1000;
+
+	printf("\n\nID e gjeneruar per furnizimin eshte: %d", id_tmp);
+	f[nr_furnizimeve].id = id_tmp;
+	
+	time_t t;
+	time(&t);
+	printf("\nData dhe Ora e furnizimit: %s", ctime(&t));
+	strcpy(f[nr_furnizimeve].data, ctime(&t));
+	
+	//****************************************************
+
+	int artikuj=0, vleraT=0;
+	char ch;
+	char aid[50];
+	int cmimi, s;
+	struct detaje temp;
+		
+	do
+	{
+		bool ugjetArtikulli = false;
+		printf("\n\n+ ARTIKULLI %d ", artikuj+1);
+		printf("\nJepni kodin e artikullit qe po furnizoni: ");
+		gets(aid);
+		
+		for(int i=0; i<nr_artikujve; i++)
+		{
+			if (strcmp(aid, a[i].id)==0)
+			{
+				ugjetArtikulli = true;
+			}
+		}
+		
+		if(ugjetArtikulli == false)
+		{
+			printf("\nArtikull me kete ID nuk ekzistion! ");
+			return;
+		}
+		
+		strcpy(temp.artikId, aid);
+
+		cmimi = 0; //cmimi i blerjes
+		printf("Jepni cmimin e blerjes per artikullin qe po furnizoni: ");
+		scanf("%d", &cmimi);
+		temp.cmimiA = cmimi;
+	
+		s = 0; //sasia e artikullit
+		printf("Jepni sasine: ");
+		scanf("%d",&s);
+		temp.sasiaA = s;
+		
+		temp.totali = s*cmimi;
+		
+		vleraT = vleraT + (s*cmimi);
+		printf("Totali: %d", vleraT);
+		
+		
+		//pasi marrim sasine e furnizimit ja shtojme sasine artikullit qe ndodhet ne magazine
+		
+		for(int i=0; i<nr_artikujve; i++)
+		{
+			if (strcmp(aid, a[i].id)==0)
+			{
+				a[i].sasia += s;
+			}
+		}
+		
+		f[nr_furnizimeve].detaj[artikuj] = temp;
+		
+		artikuj++;
+		
+		printf("\nNese doni ta mbyllni kete fature shtypni P");
+		ch = getch();    //qe te marrim karakter nga tastiera
+		
+		if(ch=='P' || ch=='p')
+		break;
+		
+		
+		
+	}while(artikuj<50);
+	
+
+	//**************************************************************
+	printf("\nVlera totale e fatures: %d", vleraT);
+	
+	f[nr_furnizimeve].vleraFatures = vleraT;
+	f[nr_furnizimeve].sasiaT = artikuj;
+
+	nr_furnizimeve++;
+	
+	update(2);
+	update(1);  // bejme update dhe per artikullin per te perditesuar sasine ne magazine (ne file)
+}
+
+void shitje()
+{	
+	int id_tmp = nr_shitjeve + 1000;
+	
+	sh[nr_shitjeve].faturaid=id_tmp;
+	
+	printf("\n\nID-ja e fatures se shitjes u gjenerua: %d", id_tmp);
+	
+	time_t t;
+	time(&t);
+	printf("\nData dhe Ora e furnizimit: %s", ctime(&t));
+	strcpy(sh[nr_shitjeve].data, ctime(&t));
+	
+	char kid[10]; 
+	printf("\nJepni kodin e klientit qe po kryen kete blerje: ");
+	gets(kid);
+	
+	
+	bool ugjetKlienti = false;
+	
+	for(int i=0; i<nr_klienteve; i++)
+	{
+		if (strcmp(kid, k[i].id)==0)
+		{
+			ugjetKlienti=true;
+		}
+	}
+	if(ugjetKlienti)
+		strcpy(sh[nr_shitjeve].klientId, kid);
+	else
+	{
+		printf("\nNuk ekziston nje klient me kete ID! ");
+		return;
+	}
+	
+	
+	//*********************************************************************
+	
+	int cmimi, sasia;     //cmimi dhe sasia qe ndodhet ne magazine per cdo artikull
+	int s;                //sasia qe kerkohet te shitet
+	int artikuj = 0;      //numri i artikujve ne fature
+	char aid[50], ch;
+	bool ugjetArtikulli = false;
+	struct detaje temp;
+	int vleraT=0;
+	do
+	{
+		printf("\nJepni kodin e artikullit qe po shisni: ");
+		gets(aid);
+		
+		for(int i=0; i<nr_artikujve; i++)
+		{
+			if (strcmp(aid, a[i].id)==0) 
+			{
+				cmimi = a[i].cmimi;
+				sasia = a[i].sasia;
+				ugjetArtikulli=true;
+			}
+		}
+		
+		if(ugjetArtikulli == false)
+		{
+			printf("Artikull me kete ID nuk ekziston! ");
+			return;
+		}                                     
+		strcpy(temp.artikId, aid); //ID e artikullit
+		
+		printf("Cmimi i artikullit: %d", cmimi);  //Cmimi
+		temp.cmimiA = cmimi;
+		
+		int s;
+		printf("\nJepni sasine: ");
+		scanf("%d",&s);
+		
+		//kontrollojme nese sasia per kete artikull eshte ne gjendje
+		
+		
+		if(s>sasia)
+		{
+			printf("\nSasia ne magazine per kete artikull eshte %d dhe nuk mjafton per kete shitje! ", sasia);
+			return;
+		}
+	
+			temp.sasiaA = s;                   // sasia
+			temp.totali = s*cmimi;             // totali
+			
+			
+			//bejme zbritjen e sasise nga magazina per artikullin qe po shesim
+		for(int i=0; i<nr_artikujve; i++)
+		{
+			if (strcmp(aid, a[i].id)==0) 
+			{
+				a[i].sasia = sasia - s;
+			}
+		}
+		sh[nr_shitjeve].info[artikuj] = temp;
+		
+		vleraT = vleraT + (s*cmimi);
+		artikuj++;
+		
+			printf("\nNese doni ta mbyllni kete fature shtypni P");
+		ch = getch();
+		
+		if(ch=='P' || ch=='p')
+		break;
+		
+		
+	}while(artikuj<10);
+	
+	//***************************************************************
+	printf("\nVlera totale e fatures: %d", vleraT);
+	sh[nr_shitjeve].vleraFatures = vleraT;
+	
+	nr_shitjeve++;
+	
+	update(4);
+	update(1);
+}
+//---------------------------------------------------------------------------
+
+void update(int x)
+{
+	FILE *fpt;
+	if(x == 1)
+	{
+	 	fpt=fopen(f_artikuj,"wb");
+	 	if (fpt==NULL)
+	 	{
+	  		return;
+	 	}
+	 	for(int i=0;i<nr_artikujve; i++)
+	 	{
+	    	fwrite(&a[i],sizeof(struct artikulli),1,fpt);
+		}
+	 	printf("\nArtikujt u perditsuan me sukses.");
+	 
+	 	fclose(fpt);	
+	}
+	else if(x == 2)
+	{
+		fpt=fopen(f_supply,"wb");
+ 		if (fpt==NULL)
+ 		{
+   			return;
+ 		}
+ 		for(int i=0;i<nr_furnizimeve; i++)
+ 		{
+    		fwrite(&f[i],sizeof(struct furnizim),1,fpt);
+		}
+ 		printf("\nFurnizimi u mbyll!");
+ 
+ 		fclose(fpt);
+	}
+	else if(x == 3)
+	{
+		fpt=fopen(f_klient,"wb");
+ 		if (fpt==NULL)
+ 		{
+   			return;
+ 		}
+ 		for(int i=0;i<nr_klienteve; i++)
+ 		{
+    		fwrite(&k[i],sizeof(struct klienti),1,fpt);
+		}
+ 		printf("\nKlienti u regjistrua me suskes.");
+ 
+ 		fclose(fpt);
+	}
+	else if(x == 4)
+	{
+
+		fpt=fopen(f_shitje,"wb");
+ 		if (fpt==NULL)
+ 		{
+   			return;
+ 		}
+ 		for(int i=0;i<nr_shitjeve; i++)
+ 		{
+    		fwrite(&sh[i],sizeof(struct shitje),1,fpt);
+		}
+ 		printf("\nShitja perfundoi me sukses.");
+ 
+ 		fclose(fpt);
+	}
+
+}
+//---------------------------------------------------------------------------
+
+void gjendja()
+{
+	printf("\n\n*** Artikujt qe ndodhen ne magazine (Gjendja) *** \n");
+	
+	printf("\n+++++++++++++++++++++++++++++++\n");
+	for(int i=0; i<nr_artikujve; i++)
+	{
+		printf("\nID Artikulli: %s",a[i].id);
+		printf("\nKategoria: %s",a[i].kategoria);
+		printf("\nEmri: %s",a[i].emri);
+		printf("\nCmimi: %d",a[i].cmimi);
+		printf("\nSasia ne magazine: %d",a[i].sasia);
+		printf("\n\n+++++++++++++++++++++++++++++++\n");
+	}
+
+}
+
+//---------------------------------------------------------------------------
+
+void kerko_artikull()
+{
+	char id_tmp[50]; 
+	printf("\n\nJepni barcodin per artikullin qe do te kontrolloni: ");
+	gets(id_tmp);
+	
+	for(int i=0; i<nr_artikujve; i++)
+	{
+		if(strcmp(id_tmp, a[i].id)==0) 
+		{
+		printf("\nID Artikulli: %s",a[i].id);
+		printf("\nEmri: %s",a[i].emri);
+		printf("\nKategoria: %s",a[i].kategoria);
+		printf("\nCmimi: %d",a[i].cmimi);
+		
+		return;
+		}
+		
+	}
+
+	printf("\nArtikulli me kete barkod nuk ndodhet ne sistem! \n");
+	
+}
+//---------------------------------------------------------------------------
+
+void SortKlient1Desc()
+{
+	//funksioni ben renditjen e vektorit strukture klient1 (rendit klientet sipas numrit te blerjeve)
+
+    int i, j;
+    struct klient1 temp;
+    
+    for (i = 0; i < nr_klienteve; i++)
+    {
+        for (j = i+1; j < nr_klienteve; j++)
+        {
+            if (kl[i].nr_blerjeve < kl[j].nr_blerjeve)
+            {
+                temp = kl[i];
+                kl[i] = kl[j];
+                kl[j] = temp;
+            } 
+        }
+        
+    }
+}
+void SortKlient2Desc()
+{
+	//ky funksion ben renditjen e vektorit strukture klient2 (pra rendit klientet sipas vleres se shpenzuar)
+    int i, j;
+    struct klient2 temp;
+    
+    for (i = 0; i < nr_klienteve; i++)
+    {
+        for (j = i+1; j < (nr_klienteve); j++)
+        {
+            if (kl2[i].vleraShpenzuar < kl2[j].vleraShpenzuar)
+            {
+                temp = kl2[i];
+                kl2[i] = kl2[j];
+                kl2[j] = temp;
+            } 
+        }
+        
+    }
+}
+//---------------------------------------------------------------------------
+
+
+void klientet_shpesh()
+{
+	loadklient1(); 
+	SortKlient1Desc();
+	
+	printf("\n\n+ + +   KLIENTET QE BLEJNE ME SHPESH (20)   + + +\n\n ");
+		
+	for(int i=0; i<nr_klienteve; i++)
+	{
+		printf("\n %d - Klienti ID: %s", i+1, kl[i].id);
+		printf("\n      Nr i blerjeve: %d", kl[i].nr_blerjeve);
+	}
+}
+
+void klientet_shume()
+{	 
+	loadklient2();
+	SortKlient2Desc();
+
+	printf("\n\n+ + +   KLIENTET QE BLEJNE ME SHUME (10)    + + + \n\n ");
+	
+	for(int i=0; i<nr_klienteve; i++)
+	{
+		printf("\n %d - Klienti ID: %s", i+1, kl2[i].id);
+		printf("\n      Vlera e shpenzuar: %d", kl2[i].vleraShpenzuar);
+	}
+}
+//---------------------------------------------------------------------------
+
+void paraqit_rezlatet()
+{
+	
+	printf("\n\nNr i artikujve ne sistem: %d",nr_artikujve);
+	printf("\nNr i klienteve ne sistem: %d", nr_klienteve);
+	printf("\nNr i furnizimeve ne sistem: %d",nr_furnizimeve);
+	printf("\nNr i shitjeve ne sistem: %d",nr_shitjeve);
+}
+
+//---------------------------------------------------------------------------
+
+int main()
+{
+	//funksionet lexo bejne mbushjen e strukturave duke lexuar informacionet e ruajtura ne filet perkatese
+	lexoArtikujt(); 
+	lexoFurnizimet(); 
+	lexoKlientet(); 
+	lexoShitjet();
+ 	
+	
+	char k;
+	do 
+	{
+		menu();
+	   	k=getch();
+	    if (k=='1') regjistro_artikull();
+	    else if (k=='2') regjistro_klient();
+	    else if (k=='3') furnizim();
+	    else if (k=='4') shitje();
+	    else if (k=='5') gjendja();
+	    else if (k=='6') klientet_shume();
+	    else if (k=='7') klientet_shpesh();
+	    else if (k=='8') kerko_artikull();
+	    else if (k=='r') paraqit_rezlatet();
+	    else if (k=='d') break;
+	   	printf("\n\n Shtypni nje karakter per te vazhduar___");
+	    getch();
+   
+	}while (k!='d' && k!='D');
+
+} 
