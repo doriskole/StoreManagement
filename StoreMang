@@ -181,7 +181,7 @@ void loadklient1()
 
 void loadklient2()                
 {
-	int vlera = 0; // tempraroly saves the amount spent by each client in the store
+	int vlera = 0; // temprarily saves the amount spent by each client in the store
 	struct klient2 tmp;
 	for(int i=0; i<nr_klienteve; i++)
 	{
